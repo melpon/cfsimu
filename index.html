@@ -529,14 +529,11 @@ $(function() {
 </script>
 
 <style type="text/css">
-#canvas {
+#main {
     margin-top: 20px;
 }
 #share {
     margin-top: 20px;
-}
-#command-list {
-    width: 400px;
 }
 </style>
 
@@ -546,16 +543,16 @@ $(function() {
   <body>
     <div id="main" role="main">
       <div class="row">
-        <div class="col-xs-offset-1 col-xs-6">
+        <div class="col-xs-offset-1 col-xs-5">
           <canvas id="canvas" width="400" height="400"></canvas>
         </div>
-        <div class="col-xs-3">
-          <a id="share" href="" target="_blank">共有用URL</a>
+        <div class="col-xs-5">
+          <div id="command-list" class="list-group"></div>
         </div>
       </div>
       <div class="row">
-        <div class="col-xs-offset-1 col-xs-6">
-          <div id="command-list" class="list-group"></div>
+        <div class="col-xs-offset-1 col-xs-3">
+          <a id="share" href="" target="_blank">共有用URL</a>
         </div>
       </div>
     </div>
