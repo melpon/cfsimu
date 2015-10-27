@@ -9,6 +9,9 @@
 
 <script>
 
+CF_PORTAL_SIZE = 20;
+CF_LINK_WIDTH = 3;
+
 var Board = (function() {
     var is_cross_segment = function(ax, ay, bx, by, cx, cy, dx, dy) {
         var ta = (cx - dx) * (ay - cy) + (cy - dy) * (cx - ax);
@@ -28,25 +31,29 @@ var Board = (function() {
             is_left(cf.p2.x, cf.p2.y, cf.p3.x, cf.p3.y, portal.x, portal.y) &&
             is_left(cf.p3.x, cf.p3.y, cf.p1.x, cf.p1.y, portal.x, portal.y);
     };
-    var linkable = function(portal1, portal2) {
+    var linkable = function(self, portal1, portal2) {
+        // same portals
+        if (portal1.name == portal2.name) {
+            return false;
+        }
         // already linked
-        for (var i = 0; i < this.links.length; i++) {
-            var link = this.links[i];
+        for (var i = 0; i < self.links.length; i++) {
+            var link = self.links[i];
             if (link.from.name == portal1.name && link.to.name == portal2.name ||
                 link.from.name == portal2.name && link.to.name == portal1.name) {
                 return false;
             }
         }
         // portal in a triangle
-        for (var i = 0; i < this.cfs.length; i++) {
+        for (var i = 0; i < self.cfs.length; i++) {
             var in_triangle = is_in_triangle(portal1);
             if (in_triangle) {
                 return false;
             }
         }
         // crossed link
-        for (var i = 0; i < this.links.length; i++) {
-            var link = this.links[i];
+        for (var i = 0; i < self.links.length; i++) {
+            var link = self.links[i];
             var cross = is_cross_segment(portal1.x, portal1.y, portal2.x, portal2.y, link.from.x, link.from.y, link.to.x, link.to.y);
             if (cross) {
                 return false;
@@ -54,55 +61,76 @@ var Board = (function() {
         }
         return true;
     };
-    var get_link_portals_from = function(portal) {
+    var get_link_portals_from = function(self, portal) {
         var results = []
-        for (var i = 0; i < this.links.length; i++) {
-            if (portal.name == this.links[i].from.name) {
-                results.push(this.links[i].to);
-            } else if (portal.name == this.links[i].to.name) {
-                results.push(this.links[i].from);
+        for (var i = 0; i < self.links.length; i++) {
+            if (portal.name == self.links[i].from.name) {
+                results.push(self.links[i].to);
+            } else if (portal.name == self.links[i].to.name) {
+                results.push(self.links[i].from);
             }
         }
         return results;
     };
     var intersects_portal = function(portals1, portals2) {
         var intersects = {}
-        for (var i = 0; i < set1.length; i++) {
-            var name = set1[i].name;
+        for (var i = 0; i < portals1.length; i++) {
+            var name = portals1[i].name;
             if (!(name in intersects)) {
                 intersects[name] = {
-                    portal: set1[i],
+                    portal: portals1[i],
                     value: 0,
                 }
             }
             intersects[name].value += 1;
         }
-        for (var i = 0; i < set2.length; i++) {
-            var name = set2[i].name;
+        for (var i = 0; i < portals2.length; i++) {
+            var name = portals2[i].name;
             if (!(name in intersects)) {
                 intersects[name] = {
-                    portal: set2[i],
+                    portal: portals2[i],
                     value: 0,
                 }
             }
             intersects[name].value += 2;
         }
         var results = [];
-        for each (var name in intersects) {
+        for (var name in intersects) {
             if (intersects[name].value == 3) {
                 results.push(intersects[name].portal);
             }
         }
         return results;
     };
+    var max_area_portal = function(p1, p2, portals) {
+        var result = null;
+        var max_area = 0;
+        for (var i = 0; i < portals.length; i++) {
+            var p3 = portals[i];
+            var area = (p1.x * (p2.y - p3.y) + p2.x * (p3.y - p1.y) + p3.x * (p1.y - p2.y)) * 0.5;
+            if (area < 0) {
+                area *= -1;
+            }
+            if (area > max_area) {
+                max_area = area;
+                result = p3;
+            }
+        }
+        return result;
+    };
 
     function Board() {
+        this.clear();
+    }
+    Board.prototype.clear = function() {
         this.portals = {};
         this.links = [];
         this.cfs = [];
-    }
+        this._selected_portal = null;
+    };
     Board.prototype.locate_portal = function(name, x, y, color) {
         this.portals[name] = {
+            name: name,
             x: x,
             y: y,
             color: color,
@@ -114,7 +142,7 @@ var Board = (function() {
     Board.prototype.link = function(from, to) {
         var p1 = this.portals[from];
         var p2 = this.portals[to];
-        var v = linkable(p1, p2);
+        var v = linkable(this, p1, p2);
         if (!v) {
             return;
         }
@@ -124,90 +152,391 @@ var Board = (function() {
             to: p2,
         });
         // create control fields
-        from_p1 = get_link_portals_from(p1);
-        from_p2 = get_link_portals_from(p2);
-        this.cfs
+        var from_p1 = get_link_portals_from(this, p1);
+        var from_p2 = get_link_portals_from(this, p2);
+        var triangle_portals = intersects_portal(from_p1, from_p2);
+        var left_portals = [];
+        var right_portals = [];
+        for (var i = 0; i < triangle_portals.length; i++) {
+            var p = triangle_portals[i];
+            if (is_left(p1.x, p1.y, p2.x, p2.y, p.x, p.y)) {
+                left_portals.push(p);
+            } else {
+                right_portals.push(p);
+            }
+        }
+        var left_portal = max_area_portal(p1, p2, left_portals);
+        var right_portal = max_area_portal(p1, p2, right_portals);
+        if (left_portal != null) {
+            this.cfs.push({
+                p1: p1,
+                p2: p2,
+                p3: left_portal,
+            });
+        }
+        if (right_portal != null) {
+            this.cfs.push({
+                p1: p2,
+                p2: p1,
+                p3: right_portal,
+            });
+        }
     };
+    Board.prototype.hit_portal = function(px, py) {
+        for (var name in this.portals) {
+            var portal = this.portals[name];
+            if (portal.x - CF_PORTAL_SIZE / 2 <= px && px <= portal.x + CF_PORTAL_SIZE / 2 &&
+                portal.y - CF_PORTAL_SIZE / 2 <= py && py <= portal.y + CF_PORTAL_SIZE / 2) {
+                return portal.name;
+            }
+        }
+        return null;
+    };
+
+    Board.prototype.draw_portal = function(ctx, portal, selected) {
+        var color;
+        if (selected == portal.name) {
+            color = 'rgba(0, 255, 255, 1.0)';
+        } else {
+            color = portal.color == 'ENL' ? 'rgba(0, 255, 0, 1.0)' : 'rgba(0, 0, 255, 1.0)';
+        }
+        ctx.beginPath();
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = color;
+        ctx.fillStyle = color;
+        ctx.arc(portal.x, portal.y, CF_PORTAL_SIZE / 2, 0, 2 * Math.PI, false);
+        ctx.fill();
+        ctx.stroke();
+    };
+    Board.prototype.draw_link = function(ctx, link) {
+        var color = link.from.color == 'ENL' ? 'rgba(0, 255, 0, 1.0)' : 'rgba(0, 0, 255, 1.0)';
+        ctx.lineWidth = CF_LINK_WIDTH;
+        ctx.strokeStyle = color;
+        ctx.beginPath();
+        ctx.moveTo(link.from.x, link.from.y);
+        ctx.lineTo(link.to.x, link.to.y);
+        ctx.stroke();
+    };
+    Board.prototype.draw_control_field = function(ctx, cf) {
+        var color = cf.p1.color == 'ENL' ? 'rgba(0, 255, 0, 0.3)' : 'rgba(0, 0, 255, 0.3)';
+        ctx.strokeStyle = color;
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.moveTo(cf.p1.x, cf.p1.y);
+        ctx.lineTo(cf.p2.x, cf.p2.y);
+        ctx.lineTo(cf.p3.x, cf.p3.y);
+        ctx.closePath();
+        ctx.fill();
+    };
+    Board.prototype.draw = function(ctx, selected) {
+        for (var i = 0; i <  this.cfs.length; i++) {
+            var cf = this.cfs[i];
+            this.draw_control_field(ctx, cf);
+        }
+        for (var i = 0; i <  this.links.length; i++) {
+            var link = this.links[i];
+            this.draw_link(ctx, link);
+        }
+        for (var name in this.portals) {
+            var portal = this.portals[name];
+            this.draw_portal(ctx, portal, selected);
+        }
+    };
+
+    return Board;
 })();
 
-$(function() {
-  // locate glyph
-  var glyphs = [];
-  for (var i = 0; i < GS_GLYPH_POINTS.length; i++) {
-    glyphs.push({
-      x: GS_BOARD_WIDTH * GS_GLYPH_POINTS[i].x + GS_GLYPH_OFFSET_X,
-      y: GS_BOARD_HEIGHT * GS_GLYPH_POINTS[i].y + GS_GLYPH_OFFSET_Y,
-    });
-  }
-  var moving = false;
-  var lastHit = null;
-  var ctx = $('#canvas')[0].getContext("2d");
-
-  clearCanvas(ctx, $('#canvas'), glyphs);
-
-  var lastMoveX = null;
-  var lastMoveY = null;
-
-  var isg = new IncrementalSearchGlyph();
-  $('#clear').click(function() {
-    isg.clear();
-    updateCandidates([]);
-  });
-
-  $('#canvas').on('touchstart mousedown', function(e) {
-    e.preventDefault();
-    moving = true;
-    var p = getMousePoint(e, this);
-
-    lastMoveX = p.x;
-    lastMoveY = p.y;
-  });
-  $('#canvas').on('touchmove mousemove', function(e) {
-    if (!moving) return;
-
-    e.preventDefault();
-    var p = getMousePoint(e, this);
-    drawLine(ctx, lastMoveX, lastMoveY, p.x, p.y);
-    lastMoveX = p.x;
-    lastMoveY = p.y;
-
-    for (var i = 0; i < glyphs.length; i++) {
-      if (glyphs[i].x - GS_HIT_SIZE / 2 < p.x && p.x < glyphs[i].x + GS_HIT_SIZE / 2 &&
-          glyphs[i].y - GS_HIT_SIZE / 2 < p.y && p.y < glyphs[i].y + GS_HIT_SIZE / 2) {
-        if (lastHit == null || lastHit != i) {
-          glyphs[i].hit = true;
-          lastHit = i;
-          drawGlyph(ctx, glyphs, i);
-
-          isg.hitGlyph(i);
-          var cd = isg.getCurrentGlyphCandidates();
-          updateCandidates(cd);
-        }
-      }
+var CommandList = (function() {
+    function CommandList() {
+        this.commands = [];
+        this.current = 0;
+        this.portal_id = 1;
     }
-  });
-  $('#canvas').on('touchup mouseup', function(e) {
-    if (!moving) return;
-    e.preventDefault();
-    moving = false;
-    isg.nextSequence();
-    clearCanvas(ctx, $('#canvas'), glyphs);
-  });
-  $('#canvas').on('touchcancel mouseleave', function(e) {
-    if (!moving) return;
-    e.preventDefault();
-    moving = false;
-    isg.nextSequence();
-    clearCanvas(ctx, $('#canvas'), glyphs);
-  });
+    CommandList.prototype.incr_portal_id = function() {
+        return this.portal_id++;
+    };
+    CommandList.prototype._add_command = function(command) {
+        this.commands.splice(this.current, this.commands.length - this.current, command);
+        this.current += 1;
+    };
+    CommandList.prototype.get_commands = function() {
+        return this.commands;
+    };
+    CommandList.prototype.get_current = function() {
+        return this.current;
+    };
+    CommandList.prototype.locate_portal = function(name, x, y, color) {
+        this._add_command({
+            type: 'locate_portal',
+            name: name,
+            x: x,
+            y: y,
+            color: color,
+            run: function(board) { board.locate_portal(name, x, y, color); },
+        });
+    };
+    CommandList.prototype.link = function(from, to) {
+        this._add_command({
+            type: 'link',
+            from: from,
+            to: to,
+            run: function(board) { board.link(from, to); },
+        });
+    };
+    CommandList.prototype.set_current = function(current) {
+        this.current = current;
+    };
+    CommandList.prototype.add_current = function(num) {
+        this.current += num;
+        if (this.current < 0) this.current = 0;
+        if (this.current > this.commands.length) this.current = this.commands.length;
+    }
+    CommandList.prototype.apply = function(board) {
+        board.clear();
+        for (var i = 0; i < this.current; i++) {
+            var command = this.commands[i];
+            command.run(board);
+        }
+    };
+    var serialize_int = function(num) {
+        return ('00' + num.toString(16)).slice(-3); // hex and zero padding
+    };
+    var serialize_string = function(str) {
+        var result = '';
+        result += serialize_int(str.length);
+        result += str;
+        return result;
+    };
+    var deserialize_int = function(str) {
+        var num = str.slice(0, 3);
+        var remain = str.slice(3);
+        return { result: parseInt(num, 16), remain: remain };
+    };
+    var deserialize_string = function(str) {
+        var x = deserialize_int(str);
+        return { result: x.remain.slice(0, x.result), remain: x.remain.slice(x.result) };
+    };
+    CommandList.prototype.to_string = function() {
+        var str = '';
+        str += serialize_int(this.portal_id);
+        str += serialize_int(this.current);
+        for (var i = 0; i < this.commands.length; i++) {
+            var command = this.commands[i];
+            if (command.type == 'locate_portal') {
+                str += 'p';
+                str += serialize_string(command.name);
+                str += serialize_int(command.x);
+                str += serialize_int(command.y);
+                str += command.color == 'ENL' ? 'e' : 'r';
+            } else if (command.type == 'link') {
+                str += 'l';
+                str += serialize_string(command.from);
+                str += serialize_string(command.to);
+            }
+        }
+        return str;
+    };
+    CommandList.prototype.from_string = function(str) {
+        var remain = str;
+
+        var t = deserialize_int(remain);
+        this.portal_id = t.result;
+        remain = t.remain;
+
+        var t = deserialize_int(remain);
+        var current = t.result;
+        remain = t.remain;
+
+        while (remain.length != 0) {
+            var type = remain[0];
+            remain = remain.slice(1);
+            if (type == 'p') {
+                t = deserialize_string(remain);
+                var name = t.result;
+                remain = t.remain;
+
+                t = deserialize_int(remain);
+                var x = t.result;
+                remain = t.remain;
+
+                t = deserialize_int(remain);
+                var y = t.result;
+                remain = t.remain;
+
+                color = remain[0] == 'e' ? 'ENL' : 'RES';
+                remain = remain.slice(1);
+
+                this.locate_portal(name, x, y, color);
+            } else if (type == 'l') {
+                t = deserialize_string(remain);
+                var from = t.result;
+                remain = t.remain;
+
+                t = deserialize_string(remain);
+                var to = t.result;
+                remain = t.remain;
+
+                this.link(from, to);
+            }
+        }
+        this.set_current(current);
+    };
+    return CommandList;
+})();
+
+function getUrlVars() {
+    var vars = []
+    var hash;
+    var hashes = window.location.search.slice(1).split('&');
+    for(var i = 0; i < hashes.length; i++) {
+        hash = hashes[i].split('=');
+        vars.push(hash[0]);
+        vars[hash[0]] = hash[1];
+    }
+    return vars;
+}
+
+$(function() {
+    var canvas = $('#canvas');
+    var ctx = canvas[0].getContext('2d');
+    var clear = function() {
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(0, 0, canvas.width(), canvas.height());
+    };
+    clear();
+    var board = new Board();
+    var command_list = new CommandList();
+    var commands = [];
+    var selected = null;
+
+    $(document).on('click', '#command-list > a', function(e) {
+        e.preventDefault();
+        var index = $(this).attr('data-index');
+        command_list.set_current(parseInt(index));
+        clear();
+        command_list.apply(board);
+        update_command_list();
+        board.draw(ctx, selected);
+        update_share_link();
+    });
+
+    var update_share_link = function() {
+        var str = command_list.to_string();
+        var loc = window.location;
+        $('#share').attr('href', loc.protocol + '//' + loc.host + loc.pathname + '?p=' + str + loc.hash);
+    };
+    $(document).keydown(function(e){
+        if (e.keyCode == 38) { // up
+            command_list.add_current(-1);
+        }
+        if (e.keyCode == 40) { // down
+            command_list.add_current(1);
+        }
+        if (e.keyCode == 38 || e.keyCode == 40) {
+            clear();
+            command_list.apply(board);
+            update_command_list();
+            board.draw(ctx, selected);
+            update_share_link();
+        }
+        return false;
+    });
+
+    var update_command_list = function() {
+        var commands = command_list.get_commands();
+        var current = command_list.get_current();
+        var $command_list = $('#command-list');
+        $command_list.empty();
+        var i = 0
+        var elem = $('<a>').attr('href', '#').attr('data-index', i).addClass('list-group-item').text('');
+        if (i == current) {
+            elem.addClass('active');
+        }
+        $command_list.append(elem);
+        for ( ; i < commands.length; i++) {
+            var command = commands[i];
+            var text;
+            if (command.type == 'locate_portal') {
+                text = 'ポータル ' + command.name + ' を (' + command.x + ', ' + command.y + ') に配置';
+            } else if (command.type == 'link') {
+                text = 'ポータル ' + command.from + ' から ポータル ' + command.to + ' へリンク';
+            }
+
+            var elem = $('<a>').attr('href', '#').attr('data-index', i + 1).addClass('list-group-item').text(text);
+            if (i + 1 == current) {
+                elem.addClass('active');
+            }
+            $command_list.append(elem);
+        }
+    };
+
+    var get_mouse_point = function(e, element) {
+      var x, y;
+      if (e.changedTouches === undefined) {
+        x = e.pageX;
+        y = e.pageY;
+      } else {
+        x = e.changedTouches[0].pageX;
+        y = e.changedTouches[0].pageY;
+      }
+      var offset = $(element).offset();
+      x = x - offset.left;
+      y = y - offset.top;
+      return { x: x, y: y };
+    };
+
+    $('#canvas').on('ouchstart mousedown', function(e) {
+        e.preventDefault();
+        var p = get_mouse_point(e, this);
+        var hit = board.hit_portal(p.x, p.y);
+        if (hit == null) {
+            if (selected == null) {
+                var portal_id = command_list.incr_portal_id();
+                command_list.locate_portal(portal_id.toString(10), Math.floor(p.x), Math.floor(p.y), 'ENL');
+            } else {
+                selected = null;
+            }
+        } else {
+            if (selected == null) {
+                selected = hit;
+            } else {
+                if (hit == selected) {
+                } else {
+                    command_list.link(selected, hit);
+                    selected = null;
+                }
+            }
+        }
+        clear();
+        command_list.apply(board);
+        update_command_list();
+        board.draw(ctx, selected);
+        update_share_link();
+    });
+
+    var vars = getUrlVars();
+    if ('p' in vars && vars['p'].length != 0) {
+        command_list.from_string(vars['p']);
+        console.log(command_list);
+
+        clear();
+        command_list.apply(board);
+        update_command_list();
+        board.draw(ctx, selected);
+    }
 });
 
 </script>
 
 <style type="text/css">
 #canvas {
-  margin: 20px;
-  float: left;
+    margin-top: 20px;
+}
+#share {
+    margin-top: 20px;
+}
+#command-list {
+    width: 400px;
 }
 </style>
 
@@ -216,10 +545,19 @@ $(function() {
   </head>
   <body>
     <div id="main" role="main">
-      <canvas id="canvas" width="460" height="460"></canvas>
+      <div class="row">
+        <div class="col-xs-offset-1 col-xs-6">
+          <canvas id="canvas" width="400" height="400"></canvas>
+        </div>
+        <div class="col-xs-3">
+          <a id="share" href="" target="_blank">共有用URL</a>
+        </div>
+      </div>
+      <div class="row">
+        <div class="col-xs-offset-1 col-xs-6">
+          <div id="command-list" class="list-group"></div>
+        </div>
+      </div>
     </div>
-    <a id="clear" class="btn btn-default" href="#" role="button">Clear</a>
-    <ul id="candidates">
-    </ul>
   </body>
 </html>
