@@ -445,12 +445,15 @@ $(function() {
     var update_command_list = function() {
         var commands = command_list.get_commands();
         var current = command_list.get_current();
+        var current_elem = null;
         var $command_list = $('#command-list');
+        var scroll = $('#command-list').scrollTop();
         $command_list.empty();
         var i = 0
         var elem = $('<a>').attr('href', '#').attr('data-index', i).addClass('list-group-item').text('');
         if (i == current) {
             elem.addClass('active');
+            current_elem = elem;
         }
         $command_list.append(elem);
         for ( ; i < commands.length; i++) {
@@ -465,8 +468,19 @@ $(function() {
             var elem = $('<a>').attr('href', '#').attr('data-index', i + 1).addClass('list-group-item').text(text);
             if (i + 1 == current) {
                 elem.addClass('active');
+                current_elem = elem;
             }
             $command_list.append(elem);
+        }
+        // scroll
+        var height = $('#command-list').height();
+        var top = current_elem.position().top;
+        var elem_height = current_elem.outerHeight();
+        if (top < 0) {
+            $('#command-list').scrollTop(top + scroll);
+        }
+        if (top + elem_height > height) {
+            $('#command-list').scrollTop(top + scroll + elem_height - height);
         }
     };
 
@@ -535,6 +549,10 @@ $(function() {
 #share {
     margin-top: 20px;
 }
+#command-list {
+    height: 400px;
+    overflow-y: scroll;
+}
 </style>
 
     <title>Ingress Control Field Simulator</title>
@@ -543,16 +561,18 @@ $(function() {
   <body>
     <div id="main" role="main">
       <div class="row">
-        <div class="col-xs-offset-1 col-xs-5">
-          <canvas id="canvas" width="400" height="400"></canvas>
+        <div class="col-md-offset-1 col-md-5">
+          <div class="row">
+            <div class="col-md-12">
+              <canvas id="canvas" width="400" height="400"></canvas>
+            </div>
+            <div class="col-md-12">
+              <a id="share" href="" target="_blank">共有用URL</a>
+            </div>
+          </div>
         </div>
-        <div class="col-xs-5">
+        <div class="col-md-5">
           <div id="command-list" class="list-group"></div>
-        </div>
-      </div>
-      <div class="row">
-        <div class="col-xs-offset-1 col-xs-3">
-          <a id="share" href="" target="_blank">共有用URL</a>
         </div>
       </div>
     </div>
