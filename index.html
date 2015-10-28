@@ -26,47 +26,17 @@ var Board = (function() {
         return n > 0;
     };
     var is_in_triangle = function(portal, cf) {
-        return
+        return (
             is_left(cf.p1.x, cf.p1.y, cf.p2.x, cf.p2.y, portal.x, portal.y) &&
             is_left(cf.p2.x, cf.p2.y, cf.p3.x, cf.p3.y, portal.x, portal.y) &&
-            is_left(cf.p3.x, cf.p3.y, cf.p1.x, cf.p1.y, portal.x, portal.y);
-    };
-    var linkable = function(self, portal1, portal2) {
-        // same portals
-        if (portal1.name == portal2.name) {
-            return false;
-        }
-        // already linked
-        for (var i = 0; i < self.links.length; i++) {
-            var link = self.links[i];
-            if (link.from.name == portal1.name && link.to.name == portal2.name ||
-                link.from.name == portal2.name && link.to.name == portal1.name) {
-                return false;
-            }
-        }
-        // portal in a triangle
-        for (var i = 0; i < self.cfs.length; i++) {
-            var in_triangle = is_in_triangle(portal1);
-            if (in_triangle) {
-                return false;
-            }
-        }
-        // crossed link
-        for (var i = 0; i < self.links.length; i++) {
-            var link = self.links[i];
-            var cross = is_cross_segment(portal1.x, portal1.y, portal2.x, portal2.y, link.from.x, link.from.y, link.to.x, link.to.y);
-            if (cross) {
-                return false;
-            }
-        }
-        return true;
+            is_left(cf.p3.x, cf.p3.y, cf.p1.x, cf.p1.y, portal.x, portal.y));
     };
     var get_link_portals_from = function(self, portal) {
         var results = []
         for (var i = 0; i < self.links.length; i++) {
-            if (portal.name == self.links[i].from.name) {
+            if (portal.id == self.links[i].from.id) {
                 results.push(self.links[i].to);
-            } else if (portal.name == self.links[i].to.name) {
+            } else if (portal.id == self.links[i].to.id) {
                 results.push(self.links[i].from);
             }
         }
@@ -75,29 +45,29 @@ var Board = (function() {
     var intersects_portal = function(portals1, portals2) {
         var intersects = {}
         for (var i = 0; i < portals1.length; i++) {
-            var name = portals1[i].name;
-            if (!(name in intersects)) {
-                intersects[name] = {
+            var id = portals1[i].id;
+            if (!(id in intersects)) {
+                intersects[id] = {
                     portal: portals1[i],
                     value: 0,
                 }
             }
-            intersects[name].value += 1;
+            intersects[id].value += 1;
         }
         for (var i = 0; i < portals2.length; i++) {
-            var name = portals2[i].name;
-            if (!(name in intersects)) {
-                intersects[name] = {
+            var id = portals2[i].id;
+            if (!(id in intersects)) {
+                intersects[id] = {
                     portal: portals2[i],
                     value: 0,
                 }
             }
-            intersects[name].value += 2;
+            intersects[id].value += 2;
         }
         var results = [];
-        for (var name in intersects) {
-            if (intersects[name].value == 3) {
-                results.push(intersects[name].portal);
+        for (var id in intersects) {
+            if (intersects[id].value == 3) {
+                results.push(intersects[id].portal);
             }
         }
         return results;
@@ -128,24 +98,26 @@ var Board = (function() {
         this.cfs = [];
         this._selected_portal = null;
     };
-    Board.prototype.locate_portal = function(name, x, y, color) {
-        this.portals[name] = {
+    Board.prototype.locate_portal = function(id, name, x, y, color) {
+        this.portals[id] = {
+            id: id,
             name: name,
             x: x,
             y: y,
             color: color,
         };
     };
-    Board.prototype.capture_portal = function(name, color) {
-        this.portals[name].color = color;
+    Board.prototype.capture_portal = function(id, color) {
+        this.portals[id].color = color;
     };
     Board.prototype.link = function(from, to) {
-        var p1 = this.portals[from];
-        var p2 = this.portals[to];
-        var v = linkable(this, p1, p2);
+        var v = this.linkable(from, to);
         if (!v) {
             return;
         }
+
+        var p1 = this.portals[from];
+        var p2 = this.portals[to];
 
         this.links.push({
             from: p1,
@@ -182,12 +154,44 @@ var Board = (function() {
             });
         }
     };
+    Board.prototype.linkable = function(from, to) {
+        var portal1 = this.portals[from];
+        var portal2 = this.portals[to];
+        // same portals
+        if (portal1.id == portal2.id) {
+            return false;
+        }
+        // already linked
+        for (var i = 0; i < this.links.length; i++) {
+            var link = this.links[i];
+            if (link.from.id == portal1.id && link.to.id == portal2.id ||
+                link.from.id == portal2.id && link.to.id == portal1.id) {
+                return false;
+            }
+        }
+        // portal in a triangle
+        for (var i = 0; i < this.cfs.length; i++) {
+            var in_triangle = is_in_triangle(portal1, this.cfs[i]);
+            if (in_triangle) {
+                return false;
+            }
+        }
+        // crossed link
+        for (var i = 0; i < this.links.length; i++) {
+            var link = this.links[i];
+            var cross = is_cross_segment(portal1.x, portal1.y, portal2.x, portal2.y, link.from.x, link.from.y, link.to.x, link.to.y);
+            if (cross) {
+                return false;
+            }
+        }
+        return true;
+    };
     Board.prototype.hit_portal = function(px, py) {
-        for (var name in this.portals) {
-            var portal = this.portals[name];
+        for (var id in this.portals) {
+            var portal = this.portals[id];
             if (portal.x - CF_PORTAL_SIZE / 2 <= px && px <= portal.x + CF_PORTAL_SIZE / 2 &&
                 portal.y - CF_PORTAL_SIZE / 2 <= py && py <= portal.y + CF_PORTAL_SIZE / 2) {
-                return portal.name;
+                return portal.id;
             }
         }
         return null;
@@ -195,7 +199,7 @@ var Board = (function() {
 
     Board.prototype.draw_portal = function(ctx, portal, selected) {
         var color;
-        if (selected == portal.name) {
+        if (selected == portal.id) {
             color = 'rgba(0, 255, 255, 1.0)';
         } else {
             color = portal.color == 'ENL' ? 'rgba(0, 255, 0, 1.0)' : 'rgba(0, 0, 255, 1.0)';
@@ -237,8 +241,8 @@ var Board = (function() {
             var link = this.links[i];
             this.draw_link(ctx, link);
         }
-        for (var name in this.portals) {
-            var portal = this.portals[name];
+        for (var id in this.portals) {
+            var portal = this.portals[id];
             this.draw_portal(ctx, portal, selected);
         }
     };
@@ -248,6 +252,7 @@ var Board = (function() {
 
 var CommandList = (function() {
     function CommandList() {
+        this.portals = [];
         this.commands = [];
         this.current = 0;
         this.portal_id = 1;
@@ -259,21 +264,32 @@ var CommandList = (function() {
         this.commands.splice(this.current, this.commands.length - this.current, command);
         this.current += 1;
     };
+    CommandList.prototype.get_portals = function() {
+        return this.portals;
+    };
     CommandList.prototype.get_commands = function() {
         return this.commands;
     };
     CommandList.prototype.get_current = function() {
         return this.current;
     };
-    CommandList.prototype.locate_portal = function(name, x, y, color) {
-        this._add_command({
-            type: 'locate_portal',
+    CommandList.prototype.locate_portal = function(id, name, x, y, color) {
+        this.portals.push({
+            id: id,
             name: name,
             x: x,
             y: y,
             color: color,
-            run: function(board) { board.locate_portal(name, x, y, color); },
+            run: function(board) { board.locate_portal(id, name, x, y, color); },
         });
+    };
+    CommandList.prototype.change_name = function(id, name) {
+        for (var i = 0; i < this.portals.length; i++) {
+            var portal = this.portals[i];
+            if (portal.id == id) {
+                portal.name = name;
+            }
+        }
     };
     CommandList.prototype.link = function(from, to) {
         this._add_command({
@@ -293,6 +309,10 @@ var CommandList = (function() {
     }
     CommandList.prototype.apply = function(board) {
         board.clear();
+        for (var i = 0; i < this.portals.length; i++) {
+            var portal = this.portals[i];
+            portal.run(board);
+        }
         for (var i = 0; i < this.current; i++) {
             var command = this.commands[i];
             command.run(board);
@@ -324,14 +344,15 @@ var CommandList = (function() {
             var command = this.commands[i];
             if (command.type == 'locate_portal') {
                 str += 'p';
+                str += serialize_int(command.id);
                 str += serialize_string(command.name);
                 str += serialize_int(command.x);
                 str += serialize_int(command.y);
                 str += command.color == 'ENL' ? 'e' : 'r';
             } else if (command.type == 'link') {
                 str += 'l';
-                str += serialize_string(command.from);
-                str += serialize_string(command.to);
+                str += serialize_int(command.from);
+                str += serialize_int(command.to);
             }
         }
         return str;
@@ -351,6 +372,10 @@ var CommandList = (function() {
             var type = remain[0];
             remain = remain.slice(1);
             if (type == 'p') {
+                t = deserialize_int(remain);
+                var id = t.result;
+                remain = t.remain;
+
                 t = deserialize_string(remain);
                 var name = t.result;
                 remain = t.remain;
@@ -366,13 +391,13 @@ var CommandList = (function() {
                 color = remain[0] == 'e' ? 'ENL' : 'RES';
                 remain = remain.slice(1);
 
-                this.locate_portal(name, x, y, color);
+                this.locate_portal(id, name, x, y, color);
             } else if (type == 'l') {
-                t = deserialize_string(remain);
+                t = deserialize_int(remain);
                 var from = t.result;
                 remain = t.remain;
 
-                t = deserialize_string(remain);
+                t = deserialize_int(remain);
                 var to = t.result;
                 remain = t.remain;
 
@@ -413,13 +438,16 @@ $(function() {
         e.preventDefault();
         var index = $(this).attr('data-index');
         command_list.set_current(parseInt(index));
-        clear();
-        command_list.apply(board);
-        update_command_list();
-        board.draw(ctx, selected);
-        update_share_link();
+        update();
     });
 
+    var update = function() {
+        command_list.apply(board);
+        update_command_list();
+        clear();
+        board.draw(ctx, selected);
+        update_share_link();
+    };
     var update_share_link = function() {
         var str = command_list.to_string();
         var loc = window.location;
@@ -433,16 +461,47 @@ $(function() {
             command_list.add_current(1);
         }
         if (e.keyCode == 38 || e.keyCode == 40) {
-            clear();
-            command_list.apply(board);
-            update_command_list();
-            board.draw(ctx, selected);
-            update_share_link();
+            update();
+            return false;
         }
-        return false;
+    });
+    $(document).on('change', '#portal-list .portal-name', function(e) {
+        var text = $(this).val();
+        var id = parseInt($(this).closest('li').attr('data-id'), 10);
+        command_list.change_name(id, text);
+        update();
     });
 
     var update_command_list = function() {
+        var tmpl = (
+            '<li class="list-group-item" data-id="$id$">' +
+            '  <div class="form-group">' +
+            '   <label>ポータル名</label>' +
+            '   <input type="text" class="form-control input-sm portal-name">' +
+            '  </div>' +
+            '  <div class="form-group">' +
+            '    <label>初期陣営</label>' +
+            '    <label class="radio-inline">' +
+            '      <input type="radio" name="group-$id$" value="ENL">ENL' +
+            '    </label>' +
+            '    <label class="radio-inline">' +
+            '      <input type="radio" name="group-$id$" value="RES">RES' +
+            '    </label>' +
+            '  </div>' +
+            '</li>' +
+            '');
+        var portals = command_list.get_portals();
+        var $portal_list = $('#portal-list');
+        $portal_list.empty();
+        for (var i = 0; i < portals.length; i++) {
+            var portal = portals[i];
+            html = tmpl.replace(/\$id\$/g, portal.id);
+            var elem = $(html);
+            elem.find('.portal-name').val(portal.name).attr('data-original', portal.name);
+            elem.find('input[type="radio"][name="group-' + portal.id + '"][value="' + portal.color + '"]').prop('checked', true);
+            $portal_list.append(elem);
+        }
+
         var commands = command_list.get_commands();
         var current = command_list.get_current();
         var current_elem = null;
@@ -506,7 +565,7 @@ $(function() {
         if (hit == null) {
             if (selected == null) {
                 var portal_id = command_list.incr_portal_id();
-                command_list.locate_portal(portal_id.toString(10), Math.floor(p.x), Math.floor(p.y), 'ENL');
+                command_list.locate_portal(portal_id, portal_id.toString(10), Math.floor(p.x), Math.floor(p.y), 'ENL');
             } else {
                 selected = null;
             }
@@ -515,17 +574,16 @@ $(function() {
                 selected = hit;
             } else {
                 if (hit == selected) {
+                    // capture portal
                 } else {
-                    command_list.link(selected, hit);
+                    if (board.linkable(selected, hit)) {
+                      command_list.link(selected, hit);
+                    }
                     selected = null;
                 }
             }
         }
-        clear();
-        command_list.apply(board);
-        update_command_list();
-        board.draw(ctx, selected);
-        update_share_link();
+        update();
     });
 
     var vars = getUrlVars();
@@ -533,10 +591,7 @@ $(function() {
         command_list.from_string(vars['p']);
         console.log(command_list);
 
-        clear();
-        command_list.apply(board);
-        update_command_list();
-        board.draw(ctx, selected);
+        update();
     }
 });
 
@@ -549,8 +604,12 @@ $(function() {
 #share {
     margin-top: 20px;
 }
+#portal-list {
+    height: 200px;
+    overflow-y: scroll;
+}
 #command-list {
-    height: 400px;
+    height: 200px;
     overflow-y: scroll;
 }
 </style>
@@ -572,7 +631,19 @@ $(function() {
           </div>
         </div>
         <div class="col-md-5">
-          <div id="command-list" class="list-group"></div>
+          <div class="row">
+            <div class="col-md-12">
+              <div class="form-inline">
+              <ul id="portal-list" class="list-group">
+              </ul>
+              </div>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-md-12">
+              <div id="command-list" class="list-group"></div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
