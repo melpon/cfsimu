@@ -318,38 +318,67 @@ var CommandList = (function() {
             command.run(board);
         }
     };
+    var ENCODE_STR = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+    var DECODE_OBJ = {};
+    for (var i = 0; i < ENCODE_STR.length; i++) {
+        DECODE_OBJ[ENCODE_STR[i]] = i;
+    }
     var serialize_int = function(num) {
-        return ('00' + num.toString(16)).slice(-3); // hex and zero padding
+        // 5bit compressed encoding.
+        var n = num;
+        var result = '';
+        while (num >= 32) {
+            result += ENCODE_STR[(num & 0x1f) + 32];
+            num >>= 5;
+        }
+        result += ENCODE_STR[num];
+        return result;
     };
     var serialize_string = function(str) {
         var result = '';
+        str = encodeURIComponent(str);
         result += serialize_int(str.length);
         result += str;
         return result;
     };
     var deserialize_int = function(str) {
-        var num = str.slice(0, 3);
-        var remain = str.slice(3);
-        return { result: parseInt(num, 16), remain: remain };
+        var result = 0;
+        var n = 0;
+        while (true) {
+            var v = DECODE_OBJ[str[0]];
+            str = str.slice(1);
+            if (v >= 32) {
+                result += (v - 32) << (n * 5);
+            } else {
+                result = v << (n * 5);
+                break;
+            }
+            n++;
+        }
+        return { result: result, remain: str };
     };
     var deserialize_string = function(str) {
         var x = deserialize_int(str);
-        return { result: x.remain.slice(0, x.result), remain: x.remain.slice(x.result) };
+        return { result: decodeURIComponent(x.remain.slice(0, x.result)), remain: x.remain.slice(x.result) };
     };
     CommandList.prototype.to_string = function() {
         var str = '';
         str += serialize_int(this.portal_id);
         str += serialize_int(this.current);
+
+        str += serialize_int(this.portals.length);
+        for (var i = 0; i < this.portals.length; i++) {
+            var portal = this.portals[i];
+            str += serialize_int(portal.id);
+            str += serialize_string(portal.name);
+            str += serialize_int(portal.x);
+            str += serialize_int(portal.y);
+            str += portal.color == 'ENL' ? 'e' : 'r';
+        }
+        str += serialize_int(this.commands.length);
         for (var i = 0; i < this.commands.length; i++) {
             var command = this.commands[i];
-            if (command.type == 'locate_portal') {
-                str += 'p';
-                str += serialize_int(command.id);
-                str += serialize_string(command.name);
-                str += serialize_int(command.x);
-                str += serialize_int(command.y);
-                str += command.color == 'ENL' ? 'e' : 'r';
-            } else if (command.type == 'link') {
+            if (command.type == 'link') {
                 str += 'l';
                 str += serialize_int(command.from);
                 str += serialize_int(command.to);
@@ -368,31 +397,41 @@ var CommandList = (function() {
         var current = t.result;
         remain = t.remain;
 
-        while (remain.length != 0) {
+        var t = deserialize_int(remain);
+        var portal_length = t.result;
+        remain = t.remain;
+
+        for (var i = 0; i < portal_length; i++) {
+            t = deserialize_int(remain);
+            var id = t.result;
+            remain = t.remain;
+
+            t = deserialize_string(remain);
+            var name = t.result;
+            remain = t.remain;
+
+            t = deserialize_int(remain);
+            var x = t.result;
+            remain = t.remain;
+
+            t = deserialize_int(remain);
+            var y = t.result;
+            remain = t.remain;
+
+            color = remain[0] == 'e' ? 'ENL' : 'RES';
+            remain = remain.slice(1);
+
+            this.locate_portal(id, name, x, y, color);
+        }
+
+        var t = deserialize_int(remain);
+        var command_length = t.result;
+        remain = t.remain;
+
+        for (var i = 0; i < command_length; i++) {
             var type = remain[0];
             remain = remain.slice(1);
-            if (type == 'p') {
-                t = deserialize_int(remain);
-                var id = t.result;
-                remain = t.remain;
-
-                t = deserialize_string(remain);
-                var name = t.result;
-                remain = t.remain;
-
-                t = deserialize_int(remain);
-                var x = t.result;
-                remain = t.remain;
-
-                t = deserialize_int(remain);
-                var y = t.result;
-                remain = t.remain;
-
-                color = remain[0] == 'e' ? 'ENL' : 'RES';
-                remain = remain.slice(1);
-
-                this.locate_portal(id, name, x, y, color);
-            } else if (type == 'l') {
+            if (type == 'l') {
                 t = deserialize_int(remain);
                 var from = t.result;
                 remain = t.remain;
@@ -479,18 +518,24 @@ $(function() {
             '   <label>ポータル名</label>' +
             '   <input type="text" class="form-control input-sm portal-name">' +
             '  </div>' +
-            '  <div class="form-group">' +
-            '    <label>初期陣営</label>' +
-            '    <label class="radio-inline">' +
-            '      <input type="radio" name="group-$id$" value="ENL">ENL' +
-            '    </label>' +
-            '    <label class="radio-inline">' +
-            '      <input type="radio" name="group-$id$" value="RES">RES' +
-            '    </label>' +
-            '  </div>' +
+            //'  <div class="form-group">' +
+            //'    <label>初期陣営</label>' +
+            //'    <label class="radio-inline">' +
+            //'      <input type="radio" name="group-$id$" value="ENL">ENL' +
+            //'    </label>' +
+            //'    <label class="radio-inline">' +
+            //'      <input type="radio" name="group-$id$" value="RES">RES' +
+            //'    </label>' +
+            //'  </div>' +
             '</li>' +
             '');
         var portals = command_list.get_portals();
+        var portalobj = {}
+        for (var i = 0; i < portals.length; i++) {
+            var portal = portals[i];
+            portalobj[portal.id] = portal;
+        }
+
         var $portal_list = $('#portal-list');
         $portal_list.empty();
         for (var i = 0; i < portals.length; i++) {
@@ -521,7 +566,7 @@ $(function() {
             if (command.type == 'locate_portal') {
                 text = 'ポータル ' + command.name + ' を (' + command.x + ', ' + command.y + ') に配置';
             } else if (command.type == 'link') {
-                text = 'ポータル ' + command.from + ' から ポータル ' + command.to + ' へリンク';
+                text = 'ポータル ' + portalobj[command.from].name + ' から ポータル ' + portalobj[command.to].name + ' へリンク';
             }
 
             var elem = $('<a>').attr('href', '#').attr('data-index', i + 1).addClass('list-group-item').text(text);
