@@ -107,8 +107,23 @@ var Board = (function() {
             color: color,
         };
     };
-    Board.prototype.capture_portal = function(id, color) {
-        this.portals[id].color = color;
+    Board.prototype.capture_portal = function(id) {
+        this.portals[id].color = this.portals[id].color == 'ENL' ? 'RES' : 'ENL';
+        // remove links and control fields.
+        for (var i = 0; i < this.links.length; i++) {
+            var link = this.links[i];
+            if (link.from.id == id || link.to.id == id) {
+                this.links.splice(i, 1);
+                i--;
+            }
+        }
+        for (var i = 0; i < this.cfs.length; i++) {
+            var cf = this.cfs[i];
+            if (cf.p1.id == id || cf.p2.id == id || cf.p3.id == id) {
+                this.cfs.splice(i, 1);
+                i--;
+            }
+        }
     };
     Board.prototype.link = function(from, to) {
         var v = this.linkable(from, to);
@@ -159,6 +174,10 @@ var Board = (function() {
         var portal2 = this.portals[to];
         // same portals
         if (portal1.id == portal2.id) {
+            return false;
+        }
+        // difference color
+        if (portal1.color != portal2.color) {
             return false;
         }
         // already linked
@@ -290,6 +309,13 @@ var CommandList = (function() {
                 portal.name = name;
             }
         }
+    };
+    CommandList.prototype.capture_portal = function(id) {
+        this._add_command({
+            type: 'capture_portal',
+            id: id,
+            run: function(board) { board.capture_portal(id); },
+        });
     };
     CommandList.prototype.link = function(from, to) {
         this._add_command({
@@ -563,8 +589,8 @@ $(function() {
         for ( ; i < commands.length; i++) {
             var command = commands[i];
             var text;
-            if (command.type == 'locate_portal') {
-                text = 'ポータル ' + command.name + ' を (' + command.x + ', ' + command.y + ') に配置';
+            if (command.type == 'capture_portal') {
+                text = 'ポータル ' + portalobj[command.id].name + ' をキャプチャー';
             } else if (command.type == 'link') {
                 text = 'ポータル ' + portalobj[command.from].name + ' から ポータル ' + portalobj[command.to].name + ' へリンク';
             }
@@ -619,7 +645,8 @@ $(function() {
                 selected = hit;
             } else {
                 if (hit == selected) {
-                    // capture portal
+                    command_list.capture_portal(hit);
+                    selected = null;
                 } else {
                     if (board.linkable(selected, hit)) {
                       command_list.link(selected, hit);
