@@ -96,7 +96,6 @@ var Board = (function() {
         this.portals = {};
         this.links = [];
         this.cfs = [];
-        this._selected_portal = null;
     };
     Board.prototype.locate_portal = function(id, name, x, y, color) {
         this.portals[id] = {
@@ -271,11 +270,14 @@ var Board = (function() {
 
 var CommandList = (function() {
     function CommandList() {
+        this.clear();
+    }
+    CommandList.prototype.clear = function() {
         this.portals = [];
         this.commands = [];
         this.current = 0;
         this.portal_id = 1;
-    }
+    };
     CommandList.prototype.incr_portal_id = function() {
         return this.portal_id++;
     };
@@ -299,14 +301,47 @@ var CommandList = (function() {
             x: x,
             y: y,
             color: color,
-            run: function(board) { board.locate_portal(id, name, x, y, color); },
+            run: function(board) { board.locate_portal(this.id, this.name, this.x, this.y, this.color); },
         });
+    };
+    CommandList.prototype.remove_portal = function(id) {
+        if (!this.is_portal_removable(id))
+            return;
+        for (var i = 0; i < this.portals.length; i++) {
+            var portal = this.portals[i];
+            if (portal.id == id) {
+                this.portals.splice(i, 1);
+                break;
+            }
+        }
+    };
+    CommandList.prototype.is_portal_removable = function(id) {
+        // a portal can remove if the portal is not used.
+        for (var i = 0; i < this.commands.length; i++) {
+            var command = this.commands[i];
+            if (command.type == 'capture_portal') {
+                if (command.id == id)
+                    return false;
+            } else if (command.type == 'link') {
+                if (command.from == id || command.to == id)
+                    return false;
+            }
+        }
+        return true;
     };
     CommandList.prototype.change_name = function(id, name) {
         for (var i = 0; i < this.portals.length; i++) {
             var portal = this.portals[i];
             if (portal.id == id) {
                 portal.name = name;
+            }
+        }
+    };
+    CommandList.prototype.change_color = function(id, color) {
+        for (var i = 0; i < this.portals.length; i++) {
+            var portal = this.portals[i];
+            if (portal.id == id) {
+                portal.color = color;
             }
         }
     };
@@ -404,7 +439,10 @@ var CommandList = (function() {
         str += serialize_int(this.commands.length);
         for (var i = 0; i < this.commands.length; i++) {
             var command = this.commands[i];
-            if (command.type == 'link') {
+            if (command.type == 'capture_portal') {
+                str += 'c';
+                str += serialize_int(command.id);
+            } else if (command.type == 'link') {
                 str += 'l';
                 str += serialize_int(command.from);
                 str += serialize_int(command.to);
@@ -457,7 +495,13 @@ var CommandList = (function() {
         for (var i = 0; i < command_length; i++) {
             var type = remain[0];
             remain = remain.slice(1);
-            if (type == 'l') {
+            if (type == 'c') {
+                t = deserialize_int(remain);
+                var id = t.result;
+                remain = t.remain;
+
+                this.capture_portal(id);
+            } else if (type == 'l') {
                 t = deserialize_int(remain);
                 var from = t.result;
                 remain = t.remain;
@@ -474,17 +518,300 @@ var CommandList = (function() {
     return CommandList;
 })();
 
-function getUrlVars() {
-    var vars = []
-    var hash;
-    var hashes = window.location.search.slice(1).split('&');
-    for(var i = 0; i < hashes.length; i++) {
-        hash = hashes[i].split('=');
-        vars.push(hash[0]);
-        vars[hash[0]] = hash[1];
+var Preset = (function() {
+    function Preset() {
     }
-    return vars;
-}
+    Preset.prototype.preset = function(name, target, color, generate_id) {
+        var rcolor = color == 'ENL' ? 'RES' : 'ENL';
+        if (name == 'basic1' || name == 'basic2') {
+            var a = generate_id();
+            var b = generate_id();
+            var c = generate_id();
+            var p = generate_id();
+            target.locate_portal(a, 'a', 200, 100, rcolor);
+            target.locate_portal(b, 'b', 113, 250, rcolor);
+            target.locate_portal(c, 'c', 287, 250, rcolor);
+            target.locate_portal(p, 'p', 200, 200, rcolor);
+        }
+        if (name == 'basic1') {
+            target.capture_portal(b);
+            target.capture_portal(c);
+            target.link(c, b);
+            target.capture_portal(p);
+            target.link(p, b);
+            target.link(p, c);
+            target.capture_portal(a);
+            target.link(a, b);
+            target.link(a, c);
+            target.link(a, p);
+        }
+        if (name == 'basic2') {
+            target.capture_portal(p);
+            target.capture_portal(a);
+            target.capture_portal(b);
+            target.capture_portal(c);
+            target.link(a, b);
+            target.link(b, c);
+            target.link(c, a);
+            target.link(a, p);
+            target.link(b, p);
+            target.link(c, p);
+        }
+        if (name == 'oneway1' || name == 'oneway2') {
+            var a = generate_id();
+            var b = generate_id();
+            var p1 = generate_id();
+            var p2 = generate_id();
+            var p3 = generate_id();
+            var p4 = generate_id();
+            target.locate_portal(a, 'a', 50, 340, rcolor);
+            target.locate_portal(b, 'b', 350, 340, rcolor);
+            target.locate_portal(p1, 'p1', 200, 270, rcolor);
+            target.locate_portal(p2, 'p2', 200, 200, rcolor);
+            target.locate_portal(p3, 'p3', 200, 130, rcolor);
+            target.locate_portal(p4, 'p4', 200, 60, rcolor);
+        }
+        if (name == 'oneway1') {
+            target.capture_portal(a);
+            target.capture_portal(b);
+            target.link(b, a);
+            target.capture_portal(p1);
+            target.link(p1, a);
+            target.link(p1, b);
+            target.capture_portal(p2);
+            target.link(p2, a);
+            target.link(p2, b);
+            target.link(p2, p1);
+            target.capture_portal(p3);
+            target.link(p3, a);
+            target.link(p3, b);
+            target.link(p3, p2);
+            target.capture_portal(p4);
+            target.link(p4, a);
+            target.link(p4, b);
+            target.link(p4, p3);
+        }
+        if (name == 'oneway2') {
+            target.capture_portal(p4);
+            target.capture_portal(p3);
+            target.link(p3, p4);
+            target.capture_portal(p2);
+            target.link(p2, p3);
+            target.capture_portal(p1);
+            target.link(p1, p2);
+            target.capture_portal(a);
+            target.link(a, p4);
+            target.link(a, p3);
+            target.link(a, p2);
+            target.link(a, p1);
+            target.capture_portal(b);
+            target.link(b, a);
+            target.link(b, p4);
+            target.link(b, p3);
+            target.link(b, p2);
+            target.link(b, p1);
+        }
+        if (name == 'twoway1' || name == 'twoway2') {
+            var a1 = generate_id();
+            var a2 = generate_id();
+            var a3 = generate_id();
+            var a4 = generate_id();
+            var b1 = generate_id();
+            var b2 = generate_id();
+            var b3 = generate_id();
+            var b4 = generate_id();
+            var c = generate_id();
+            target.locate_portal(c, 'c', 200, 300, rcolor);
+            target.locate_portal(a1, 'a1', 240, 170, rcolor);
+            target.locate_portal(a2, 'a2', 280, 140, rcolor);
+            target.locate_portal(a3, 'a3', 320, 110, rcolor);
+            target.locate_portal(a4, 'a4', 360, 80, rcolor);
+            target.locate_portal(b1, 'b1', 160, 170, rcolor);
+            target.locate_portal(b2, 'b2', 120, 140, rcolor);
+            target.locate_portal(b3, 'b3', 80, 110, rcolor);
+            target.locate_portal(b4, 'b4', 40, 80, rcolor);
+        }
+        if (name == 'twoway1') {
+            target.capture_portal(c);
+            target.capture_portal(a1);
+            target.link(a1, c);
+            target.capture_portal(b1);
+            target.link(b1, c);
+            target.link(b1, a1);
+            target.capture_portal(a2);
+            target.link(a2, c);
+            target.link(a2, b1);
+            target.link(a2, a1);
+            target.capture_portal(b2);
+            target.link(b2, c);
+            target.link(b2, a2);
+            target.link(b2, b1);
+            target.capture_portal(a3);
+            target.link(a3, c);
+            target.link(a3, b2);
+            target.link(a3, a2);
+            target.capture_portal(b3);
+            target.link(b3, c);
+            target.link(b3, a3);
+            target.link(b3, b2);
+            target.capture_portal(a4);
+            target.link(a4, c);
+            target.link(a4, b3);
+            target.link(a4, a3);
+            target.capture_portal(b4);
+            target.link(b4, c);
+            target.link(b4, a4);
+            target.link(b4, b3);
+        }
+        if (name == 'twoway2') {
+            target.capture_portal(a4);
+            target.capture_portal(a3);
+            target.link(a3, a4);
+            target.capture_portal(a2);
+            target.link(a2, a3);
+            target.capture_portal(a1);
+            target.link(a1, a2);
+            target.capture_portal(b1);
+            target.link(b1, a1);
+            target.link(b1, a2);
+            target.capture_portal(b2);
+            target.link(b2, b1);
+            target.link(b2, a2);
+            target.link(b2, a3);
+            target.capture_portal(b3);
+            target.link(b3, b2);
+            target.link(b3, a3);
+            target.link(b3, a4);
+            target.capture_portal(b4);
+            target.link(b4, b3);
+            target.link(b4, a4);
+            target.capture_portal(c);
+            target.link(c, b4);
+            target.link(c, a4);
+            target.link(c, b3);
+            target.link(c, a3);
+            target.link(c, b2);
+            target.link(c, a2);
+            target.link(c, b1);
+            target.link(c, a1);
+        }
+        if (name == 'threeway1' || name == 'threeway2') {
+            var a1 = generate_id();
+            var a2 = generate_id();
+            var a3 = generate_id();
+            var a4 = generate_id();
+            var b1 = generate_id();
+            var b2 = generate_id();
+            var b3 = generate_id();
+            var b4 = generate_id();
+            var c1 = generate_id();
+            var c2 = generate_id();
+            var c3 = generate_id();
+            var c4 = generate_id();
+            target.locate_portal(a1, 'a1', 240, 130, rcolor);
+            target.locate_portal(a2, 'a2', 280, 100, rcolor);
+            target.locate_portal(a3, 'a3', 320, 70, rcolor);
+            target.locate_portal(a4, 'a4', 360, 40, rcolor);
+            target.locate_portal(b1, 'b1', 160, 130, rcolor);
+            target.locate_portal(b2, 'b2', 120, 100, rcolor);
+            target.locate_portal(b3, 'b3', 80, 70, rcolor);
+            target.locate_portal(b4, 'b4', 40, 40, rcolor);
+            target.locate_portal(c1, 'c1', 200, 210, rcolor);
+            target.locate_portal(c2, 'c2', 200, 260, rcolor);
+            target.locate_portal(c3, 'c3', 200, 310, rcolor);
+            target.locate_portal(c4, 'c4', 200, 360, rcolor);
+        }
+        if (name == 'threeway1') {
+            target.capture_portal(a1);
+            target.capture_portal(b1);
+            target.link(b1, a1);
+            target.capture_portal(c1);
+            target.link(c1, b1);
+            target.link(a1, c1);
+            target.capture_portal(a2);
+            target.link(a2, c1);
+            target.link(a2, b1);
+            target.link(a2, a1);
+            target.capture_portal(b2);
+            target.link(b2, a2);
+            target.link(b2, c1);
+            target.link(b2, b1);
+            target.capture_portal(c2);
+            target.link(c2, b2);
+            target.link(c2, a2);
+            target.link(c2, c1);
+            target.capture_portal(a3);
+            target.link(a3, c2);
+            target.link(a3, b2);
+            target.link(a3, a2);
+            target.capture_portal(b3);
+            target.link(b3, a3);
+            target.link(b3, c2);
+            target.link(b3, b2);
+            target.capture_portal(c3);
+            target.link(c3, b3);
+            target.link(c3, a3);
+            target.link(c3, c2);
+            target.capture_portal(a4);
+            target.link(a4, c3);
+            target.link(a4, b3);
+            target.link(a4, a3);
+            target.capture_portal(b4);
+            target.link(b4, a4);
+            target.link(b4, c3);
+            target.link(b4, b3);
+            target.capture_portal(c4);
+            target.link(c4, b4);
+            target.link(c4, a4);
+            target.link(c4, c3);
+        }
+        if (name == 'threeway2') {
+            target.capture_portal(a4);
+            target.capture_portal(a3);
+            target.link(a3, a4);
+            target.capture_portal(a2);
+            target.link(a2, a3);
+            target.capture_portal(a1);
+            target.link(a1, a2);
+            target.capture_portal(b1);
+            target.link(b1, a1);
+            target.link(b1, a2);
+            target.capture_portal(b2);
+            target.link(b2, b1);
+            target.link(b2, a2);
+            target.link(b2, a3);
+            target.capture_portal(b3);
+            target.link(b3, b2);
+            target.link(b3, a3);
+            target.link(b3, a4);
+            target.capture_portal(b4);
+            target.link(b4, b3);
+            target.link(b4, a4);
+            target.capture_portal(c1);
+            target.link(c1, b2);
+            target.link(c1, a2);
+            target.link(c1, b1);
+            target.link(c1, a1);
+            target.capture_portal(c2);
+            target.link(c2, b3);
+            target.link(c2, a3);
+            target.link(c2, b2);
+            target.link(c2, a2);
+            target.link(c2, c1);
+            target.capture_portal(c3);
+            target.link(c3, b4);
+            target.link(c3, a4);
+            target.link(c3, b3);
+            target.link(c3, a3);
+            target.link(c3, c2);
+            target.capture_portal(c4);
+            target.link(c4, b4);
+            target.link(c4, a4);
+            target.link(c4, c3);
+        }
+    };
+    return Preset;
+})();
 
 $(function() {
     var canvas = $('#canvas');
@@ -496,8 +823,8 @@ $(function() {
     clear();
     var board = new Board();
     var command_list = new CommandList();
-    var commands = [];
     var selected = null;
+    var preset = new Preset();
 
     $(document).on('click', '#command-list > a', function(e) {
         e.preventDefault();
@@ -536,23 +863,45 @@ $(function() {
         command_list.change_name(id, text);
         update();
     });
+    $(document).on('click', '#portal-list button.close[type="button"]', function(e) {
+        var li = $(this).closest('li');
+        command_list.remove_portal(parseInt(li.attr('data-id')));
+        li.remove();
+        update();
+    });
+    $(document).on('change', '#portal-list input.initial-group', function(e) {
+        var id = parseInt($(this).closest('li').attr('data-id'));
+        var color = $(this).attr('value');
+        command_list.change_color(id, color);
+        update();
+    });
+    $('#clear').on('click', function(e) {
+        command_list.clear();
+        update();
+    });
+    $('.preset').on('click', function(e) {
+        command_list.clear();
+        preset.preset($(this).attr('data-name'), command_list, 'ENL', function() { return command_list.incr_portal_id(); });
+        update();
+    });
 
     var update_command_list = function() {
         var tmpl = (
             '<li class="list-group-item" data-id="$id$">' +
+            '  <button type="button" class="close" aria-label="Close"><span aria-hidden="true">&times;</span></button>' +
             '  <div class="form-group">' +
             '   <label>ポータル名</label>' +
             '   <input type="text" class="form-control input-sm portal-name">' +
             '  </div>' +
-            //'  <div class="form-group">' +
-            //'    <label>初期陣営</label>' +
-            //'    <label class="radio-inline">' +
-            //'      <input type="radio" name="group-$id$" value="ENL">ENL' +
-            //'    </label>' +
-            //'    <label class="radio-inline">' +
-            //'      <input type="radio" name="group-$id$" value="RES">RES' +
-            //'    </label>' +
-            //'  </div>' +
+            '  <div class="form-group">' +
+            '    <label>初期陣営</label>' +
+            '    <label class="radio-inline">' +
+            '      <input type="radio" class="initial-group" name="group-$id$" value="ENL">ENL' +
+            '    </label>' +
+            '    <label class="radio-inline">' +
+            '      <input type="radio" class="initial-group" name="group-$id$" value="RES">RES' +
+            '    </label>' +
+            '  </div>' +
             '</li>' +
             '');
         var portals = command_list.get_portals();
@@ -570,6 +919,10 @@ $(function() {
             var elem = $(html);
             elem.find('.portal-name').val(portal.name).attr('data-original', portal.name);
             elem.find('input[type="radio"][name="group-' + portal.id + '"][value="' + portal.color + '"]').prop('checked', true);
+            if (!command_list.is_portal_removable(portal.id)) {
+                elem.find('button.close[type="button"]').remove();
+                elem.find('input.initial-group').prop('disabled', true);
+            }
             $portal_list.append(elem);
         }
 
@@ -658,11 +1011,21 @@ $(function() {
         update();
     });
 
-    var vars = getUrlVars();
+    function get_url_vars() {
+        var vars = []
+        var hash;
+        var hashes = window.location.search.slice(1).split('&');
+        for(var i = 0; i < hashes.length; i++) {
+            hash = hashes[i].split('=');
+            vars.push(hash[0]);
+            vars[hash[0]] = hash[1];
+        }
+        return vars;
+    }
+
+    var vars = get_url_vars();
     if ('p' in vars && vars['p'].length != 0) {
         command_list.from_string(vars['p']);
-        console.log(command_list);
-
         update();
     }
 });
@@ -684,6 +1047,9 @@ $(function() {
     height: 200px;
     overflow-y: scroll;
 }
+.preset {
+    text-align: left;
+}
 </style>
 
     <title>Ingress Control Field Simulator</title>
@@ -697,8 +1063,11 @@ $(function() {
             <div class="col-md-12">
               <canvas id="canvas" width="400" height="400"></canvas>
             </div>
-            <div class="col-md-12">
+            <div class="col-md-6">
               <a id="share" href="" target="_blank">共有用URL</a>
+            </div>
+            <div class="col-md-6">
+              <button id="clear" class="button">クリア</button>
             </div>
           </div>
         </div>
@@ -714,6 +1083,37 @@ $(function() {
           <div class="row">
             <div class="col-md-12">
               <div id="command-list" class="list-group"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="col-md-offset-1 col-md-5">
+          <div class="panel panel-default">
+            <div class="panel-heading">
+              <h3 class="panel-title">プリセット</h3>
+            </div>
+            <div class="panel-body">
+              <div><label>基本形:</label></div>
+              <div class="btn-group-vertical" role="group">
+                <button type="button" class="btn btn-default preset" data-name="basic1">外三角形型</button>
+                <button type="button" class="btn btn-default preset" data-name="basic2">内部分割型</button>
+              </div>
+              <div><label>一方向に伸ばすタイプ:</label></div>
+              <div class="btn-group-vertical" role="group">
+                <button type="button" class="btn btn-default preset" data-name="oneway1">発散型（Ａ型、タケノコ）</button>
+                <button type="button" class="btn btn-default preset" data-name="oneway2">収縮型（Ｉ型、キール）</button>
+              </div>
+              <div><label>二方向に伸ばすタイプ:</label></div>
+              <div class="btn-group-vertical" role="group">
+                <button type="button" class="btn btn-default preset" data-name="twoway1">発散型（扇型）</button>
+                <button type="button" class="btn btn-default preset" data-name="twoway2">収縮型（Ｖ型）</button>
+              </div>
+              <div><label>三方向に伸ばすタイプ:</label></div>
+              <div class="btn-group-vertical" role="group">
+                <button type="button" class="btn btn-default preset" data-name="threeway1">発散型（ぐるぐる、螺旋）</button>
+                <button type="button" class="btn btn-default preset" data-name="threeway2">収縮型（Ｙ型、カクテルグラス型）</button>
+              </div>
             </div>
           </div>
         </div>
