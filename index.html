@@ -386,13 +386,13 @@ var CommandList = (function() {
     }
     var serialize_int = function(num) {
         // 5bit compressed encoding.
-        var n = num;
         var result = '';
         while (num >= 32) {
             result += ENCODE_STR[(num & 0x1f) + 32];
             num >>= 5;
         }
         result += ENCODE_STR[num];
+
         return result;
     };
     var serialize_string = function(str) {
@@ -411,7 +411,7 @@ var CommandList = (function() {
             if (v >= 32) {
                 result += (v - 32) << (n * 5);
             } else {
-                result = v << (n * 5);
+                result = (v << (n * 5)) + result;
                 break;
             }
             n++;
