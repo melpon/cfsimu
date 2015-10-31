@@ -214,6 +214,33 @@ var Board = (function() {
         }
         return null;
     };
+    Board.prototype.get_portal_info = function(id) {
+        var portal = this.portals[id];
+        var result = {
+            name: portal.name,
+            x: portal.x,
+            y: portal.y,
+            color: portal.color,
+            in_link: 0,
+            out_link: 0,
+        };
+        for (var i = 0; i < this.links.length; i++) {
+            var link = this.links[i];
+            if (link.from.id == id) {
+                result.out_link += 1;
+            }
+            if (link.to.id == id) {
+                result.in_link += 1;
+            }
+        }
+        return result;
+    };
+    Board.prototype.get_info = function() {
+        return {
+            cf: this.cfs.length,
+            link: this.links.length,
+        };
+    };
 
     Board.prototype.draw_portal = function(ctx, portal, selected) {
         var color;
@@ -277,6 +304,10 @@ var CommandList = (function() {
         this.commands = [];
         this.current = 0;
         this.portal_id = 1;
+    };
+    CommandList.prototype.clear_without_portal = function() {
+        this.commands = [];
+        this.current = 0;
     };
     CommandList.prototype.incr_portal_id = function() {
         return this.portal_id++;
@@ -368,17 +399,71 @@ var CommandList = (function() {
         if (this.current < 0) this.current = 0;
         if (this.current > this.commands.length) this.current = this.commands.length;
     }
-    CommandList.prototype.apply = function(board) {
+    CommandList.prototype.apply = function(board, value) {
+        if (value === undefined) {
+            value = this.current;
+        }
         board.clear();
         for (var i = 0; i < this.portals.length; i++) {
             var portal = this.portals[i];
             portal.run(board);
         }
-        for (var i = 0; i < this.current; i++) {
+        for (var i = 0; i < value; i++) {
             var command = this.commands[i];
             command.run(board);
         }
     };
+    CommandList.prototype.get_info = function() {
+        var result = {
+            current: null,
+            all: null,
+        };
+        var board = new Board();
+        this.apply(board);
+        var current = board.get_info();
+        current['portals'] = {}
+        for (var i = 0; i < this.portals.length; i++) {
+            var portal = this.portals[i];
+            current['portals'][portal.id] = board.get_portal_info(portal.id);
+        }
+        result.current = current;
+
+        this.apply(board, this.commands.length);
+        var all = board.get_info();
+        all['portals'] = {}
+        for (var i = 0; i < this.portals.length; i++) {
+            var portal = this.portals[i];
+            all['portals'][portal.id] = board.get_portal_info(portal.id);
+        }
+        result.all = all;
+
+        /*
+        {
+            current: {
+                cf: <number>,
+                link: <number>,
+                portals: {
+                    <string>(id): {
+                        name: <string>,
+                        x: <number>,
+                        y: <number>,
+                        color: <string>,
+                        in_link: <number>,
+                        out_link: <number>,
+                    },
+                    <string>(id): {
+                        ...
+                    },
+                },
+            },
+            all: {
+                ...
+            },
+        }
+        */
+        return result;
+    };
+
     var ENCODE_STR = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
     var DECODE_OBJ = {};
     for (var i = 0; i < ENCODE_STR.length; i++) {
@@ -839,11 +924,33 @@ $(function() {
         clear();
         board.draw(ctx, selected);
         update_share_link();
+        update_portal_info();
     };
     var update_share_link = function() {
         var str = command_list.to_string();
         var loc = window.location;
         $('#share').attr('href', loc.protocol + '//' + loc.host + loc.pathname + '?p=' + str + loc.hash);
+    };
+    var update_portal_info = function() {
+        var info = command_list.get_info();
+        for (var id in info.current.portals) {
+            var portal = info.current.portals[id];
+            var elem = $('.portal-info-' + id);
+            elem.find('.x').text(portal.x);
+            elem.find('.y').text(portal.y);
+            elem.find('.current-in-link').text(portal.in_link);
+            elem.find('.current-out-link').text(portal.out_link);
+        }
+        for (var id in info.all.portals) {
+            var portal = info.all.portals[id];
+            var elem = $('.portal-info-' + id);
+            elem.find('.in-link').text(portal.in_link);
+            elem.find('.out-link').text(portal.out_link);
+        }
+        $('#portal-info .current-cf').text(info.current.cf);
+        $('#portal-info .current-link').text(info.current.link);
+        $('#portal-info .cf').text(info.all.cf);
+        $('#portal-info .link').text(info.all.link);
     };
     $(document).keydown(function(e){
         if (e.keyCode == 38) { // up
@@ -879,6 +986,10 @@ $(function() {
         command_list.clear();
         update();
     });
+    $('#clear-without-portal').on('click', function(e) {
+        command_list.clear_without_portal();
+        update();
+    });
     $('.preset').on('click', function(e) {
         command_list.clear();
         preset.preset($(this).attr('data-name'), command_list, 'ENL', function() { return command_list.incr_portal_id(); });
@@ -902,6 +1013,7 @@ $(function() {
             '      <input type="radio" class="initial-group" name="group-$id$" value="RES">RES' +
             '    </label>' +
             '  </div>' +
+            '  <p class="portal-info-$id$"><small>IN/OUTリンク:</small> <span class="in-link">5</span>(<span class="current-in-link">3</span>) / <span class="out-link">4</span>(<span class="current-out-link">1</span>)</p>' +
             '</li>' +
             '');
         var portals = command_list.get_portals();
@@ -1026,8 +1138,8 @@ $(function() {
     var vars = get_url_vars();
     if ('p' in vars && vars['p'].length != 0) {
         command_list.from_string(vars['p']);
-        update();
     }
+    update();
 });
 
 </script>
@@ -1047,8 +1159,18 @@ $(function() {
     height: 200px;
     overflow-y: scroll;
 }
+#buttons {
+    margin-top: 10px;
+    margin-bottom: 10px;
+}
 .preset {
     text-align: left;
+}
+#clear-without-portal {
+    margin-right: 10px;
+}
+#preset-top {
+    margin-top: 10px;
 }
 </style>
 
@@ -1063,16 +1185,18 @@ $(function() {
             <div class="col-md-12">
               <canvas id="canvas" width="400" height="400"></canvas>
             </div>
-            <div class="col-md-6">
-              <a id="share" href="" target="_blank">共有用URL</a>
-            </div>
-            <div class="col-md-6">
-              <button id="clear" class="button">クリア</button>
+            <div class="col-md-12" id="buttons">
+              <a id="share" href="" target="_blank"><span class="glyphicon glyphicon-share"></span>共有URL</a>
+              <button id="clear" class="pull-right btn btn-default">クリア</button>
+              <button id="clear-without-portal" class="pull-right btn btn-default">ポータルを残してクリア</button>
             </div>
           </div>
         </div>
         <div class="col-md-5">
           <div class="row">
+            <div class="col-md-12">
+              <p id="portal-info" class="text-right">合計CF数: <span class="cf">10</span>(<span class="current-cf">5</span>), 合計リンク数: <span class="link">15</span>(<span class="current-link">10</span>)</p>
+            </div>
             <div class="col-md-12">
               <div class="form-inline">
               <ul id="portal-list" class="list-group">
@@ -1091,28 +1215,34 @@ $(function() {
         <div class="col-md-offset-1 col-md-5">
           <div class="panel panel-default">
             <div class="panel-heading">
-              <h3 class="panel-title">プリセット</h3>
+              <a role="button" data-toggle="collapse" href="#preset-body" aria-expanded="true" aria-controls="preset-body">
+                <h3 class="panel-title">
+                  プリセット
+                </h3>
+              </a>
             </div>
-            <div class="panel-body">
-              <div><label>基本形:</label></div>
-              <div class="btn-group-vertical" role="group">
-                <button type="button" class="btn btn-default preset" data-name="basic1">外三角形型</button>
-                <button type="button" class="btn btn-default preset" data-name="basic2">内部分割型</button>
-              </div>
-              <div><label>一方向に伸ばすタイプ:</label></div>
-              <div class="btn-group-vertical" role="group">
-                <button type="button" class="btn btn-default preset" data-name="oneway1">発散型（Ａ型、タケノコ）</button>
-                <button type="button" class="btn btn-default preset" data-name="oneway2">収縮型（Ｉ型、キール）</button>
-              </div>
-              <div><label>二方向に伸ばすタイプ:</label></div>
-              <div class="btn-group-vertical" role="group">
-                <button type="button" class="btn btn-default preset" data-name="twoway1">発散型（扇型）</button>
-                <button type="button" class="btn btn-default preset" data-name="twoway2">収縮型（Ｖ型）</button>
-              </div>
-              <div><label>三方向に伸ばすタイプ:</label></div>
-              <div class="btn-group-vertical" role="group">
-                <button type="button" class="btn btn-default preset" data-name="threeway1">発散型（ぐるぐる、螺旋）</button>
-                <button type="button" class="btn btn-default preset" data-name="threeway2">収縮型（Ｙ型、カクテルグラス型）</button>
+            <div class="collapse" id="preset-body">
+              <div class="panel-body">
+                <div><label>基本形:</label></div>
+                <div class="btn-group-vertical" role="group">
+                  <button type="button" class="btn btn-default preset" data-name="basic1">外三角形型</button>
+                  <button type="button" class="btn btn-default preset" data-name="basic2">内部分割型</button>
+                </div>
+                <div><label>一方向に伸ばすタイプ:</label></div>
+                <div class="btn-group-vertical" role="group">
+                  <button type="button" class="btn btn-default preset" data-name="oneway1">発散型（Ａ型、タケノコ）</button>
+                  <button type="button" class="btn btn-default preset" data-name="oneway2">収縮型（Ｉ型、キール）</button>
+                </div>
+                <div><label>二方向に伸ばすタイプ:</label></div>
+                <div class="btn-group-vertical" role="group">
+                  <button type="button" class="btn btn-default preset" data-name="twoway1">発散型（扇型）</button>
+                  <button type="button" class="btn btn-default preset" data-name="twoway2">収縮型（Ｖ型）</button>
+                </div>
+                <div><label>三方向に伸ばすタイプ:</label></div>
+                <div class="btn-group-vertical" role="group">
+                  <button type="button" class="btn btn-default preset" data-name="threeway1">発散型（ぐるぐる、螺旋）</button>
+                  <button type="button" class="btn btn-default preset" data-name="threeway2">収縮型（Ｙ型、カクテルグラス型）</button>
+                </div>
               </div>
             </div>
           </div>
