@@ -1034,6 +1034,7 @@ $(function() {
         }
 
         var $portal_list = $('#portal-list');
+        var bottomScrolled = $portal_list.prop('scrollHeight') <= $portal_list.scrollTop() + $portal_list.height();
         $portal_list.empty();
         for (var i = 0; i < portals.length; i++) {
             var portal = portals[i];
@@ -1046,6 +1047,10 @@ $(function() {
                 elem.find('input.initial-group').prop('disabled', true);
             }
             $portal_list.append(elem);
+        }
+        // scroll
+        if (bottomScrolled) {
+            $portal_list.scrollTop($portal_list.prop('scrollHeight') - $portal_list.height());
         }
 
         var commands = command_list.get_commands();
