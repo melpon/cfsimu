@@ -325,6 +325,12 @@ var CommandList = (function() {
     CommandList.prototype.get_current = function() {
         return this.current;
     };
+    CommandList.prototype.flip = function() {
+        for (var i = 0; i < this.portals.length; i++) {
+            var portal = this.portals[i];
+            portal.color = portal.color == 'ENL' ? 'RES' : 'ENL';
+        }
+    };
     CommandList.prototype.locate_portal = function(id, name, x, y, color) {
         this.portals.push({
             id: id,
@@ -990,6 +996,10 @@ $(function() {
         command_list.clear_without_portal();
         update();
     });
+    $('#flip').on('click', function(e) {
+        command_list.flip();
+        update();
+    });
     $('.preset').on('click', function(e) {
         command_list.clear();
         preset.preset($(this).attr('data-name'), command_list, 'ENL', function() { return command_list.incr_portal_id(); });
@@ -1196,6 +1206,7 @@ $(function() {
               <a id="share" href="" target="_blank"><span class="glyphicon glyphicon-share"></span>共有URL</a>
               <button id="clear" class="pull-right btn btn-default">クリア</button>
               <button id="clear-without-portal" class="pull-right btn btn-default">ポータルを残してクリア</button>
+              <button id="flip" class="pull-right btn btn-default">反転</button>
             </div>
           </div>
         </div>
