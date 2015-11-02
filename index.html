@@ -609,6 +609,18 @@ var CommandList = (function() {
     return CommandList;
 })();
 
+// Fisher-Yates algorithm
+Array.prototype.shuffle = function() {
+    var i = this.length;
+    while (i) {
+        var j = Math.floor(Math.random() * i);
+        var t = this[--i];
+        this[i] = this[j];
+        this[j] = t;
+    }
+    return this;
+}
+
 var Preset = (function() {
     function Preset() {
     }
@@ -662,6 +674,17 @@ var Preset = (function() {
             target.locate_portal(p3, 'p3', 200, 130, rcolor);
             target.locate_portal(p4, 'p4', 200, 60, rcolor);
         }
+        if (name == 'oneway3') {
+            var ps = [];
+            for (var i = 0; i < 39; i++) {
+                ps[i] = generate_id();
+                target.locate_portal(ps[i], 'a' + ps[i], 200, 370 - i * 9, rcolor);
+            }
+            var b = generate_id();
+            var c = generate_id();
+            target.locate_portal(b, 'b', 30, 390, rcolor);
+            target.locate_portal(c, 'c', 370, 390, rcolor);
+        }
         if (name == 'oneway1') {
             target.capture_portal(a);
             target.capture_portal(b);
@@ -701,6 +724,17 @@ var Preset = (function() {
             target.link(b, p3);
             target.link(b, p2);
             target.link(b, p1);
+        }
+        if (name == 'oneway3') {
+            target.capture_portal(b);
+            target.capture_portal(c);
+            target.link(c, b);
+            ps.shuffle();
+            for (var i = 0; i < ps.length; i++) {
+                target.capture_portal(ps[i]);
+                target.link(b, ps[i]);
+                target.link(c, ps[i]);
+            }
         }
         if (name == 'twoway1' || name == 'twoway2') {
             var a1 = generate_id();
@@ -1261,6 +1295,7 @@ $(function() {
                 <div class="btn-group-vertical" role="group">
                   <button type="button" class="btn btn-default preset" data-name="oneway1">発散型（Ａ型、タケノコ）</button>
                   <button type="button" class="btn btn-default preset" data-name="oneway2">収縮型（Ｉ型、キール）</button>
+                  <button type="button" class="btn btn-default preset" data-name="oneway3">放射型（３９式）</button>
                 </div>
                 <div><label>二方向に伸ばすタイプ:</label></div>
                 <div class="btn-group-vertical" role="group">
