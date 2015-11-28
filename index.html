@@ -975,10 +975,6 @@ $(function() {
         update();
     });
 
-    $('#view-arrow').change(function(e) {
-        update();
-    });
-
     var update = function() {
         command_list.apply(board);
         update_command_list();
@@ -986,6 +982,7 @@ $(function() {
         board.draw(ctx, selected, $("#view-arrow").prop('checked'));
         update_share_link();
         update_portal_info();
+        update_command_operators();
     };
     var update_share_link = function() {
         var str = command_list.to_string();
@@ -1012,6 +1009,8 @@ $(function() {
         $('#portal-info .current-link').text(info.current.link);
         $('#portal-info .cf').text(info.all.cf);
         $('#portal-info .link').text(info.all.link);
+    };
+    var update_command_operators = function() {
     };
     $(document).keydown(function(e){
         if (e.keyCode == 38) { // up
@@ -1058,6 +1057,21 @@ $(function() {
     $('.preset').on('click', function(e) {
         command_list.clear();
         preset.preset($(this).attr('data-name'), command_list, 'ENL', function() { return command_list.incr_portal_id(); });
+        update();
+    });
+    $('#view-arrow').change(function(e) {
+        update();
+    });
+    $('#prev-command').click(function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        command_list.add_current(-1);
+        update();
+    });
+    $('#next-command').click(function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        command_list.add_current(1);
         update();
     });
 
@@ -1245,6 +1259,12 @@ $(function() {
 #preset-top {
     margin-top: 10px;
 }
+#prev-command {
+    font-size: 40px;
+}
+#next-command {
+    font-size: 40px;
+}
 </style>
 
     <title>Ingress Control Field Simulator</title>
@@ -1263,7 +1283,23 @@ $(function() {
     </nav>
     <div id="main" role="main">
       <div class="row">
-        <div class="col-md-offset-1 col-md-5">
+        <div class="col-md-1">
+          <div class="row">
+            <div class="col-md-12">
+              <div class="pull-right">
+                <a id="prev-command"><span class="glyphicon glyphicon-arrow-up"></span></a>
+              </div>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-md-12">
+              <div class="pull-right">
+                <a id="next-command"><span class="glyphicon glyphicon-arrow-down"></span></a>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-5">
           <div class="row">
             <div class="col-md-12">
               <canvas id="canvas" width="400" height="400"></canvas>

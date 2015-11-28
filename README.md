@@ -30,4 +30,3 @@ THE SOFTWARE.
 # TODO
 
 - draggable portals.
-- add a prev/next button (for mobile).
