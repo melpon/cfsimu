@@ -257,13 +257,30 @@ var Board = (function() {
         ctx.fill();
         ctx.stroke();
     };
-    Board.prototype.draw_link = function(ctx, link) {
+    Board.prototype.draw_link = function(ctx, link, view_arrow) {
         var color = link.from.color == 'ENL' ? 'rgba(0, 255, 0, 1.0)' : 'rgba(0, 0, 255, 1.0)';
         ctx.lineWidth = CF_LINK_WIDTH;
         ctx.strokeStyle = color;
         ctx.beginPath();
         ctx.moveTo(link.from.x, link.from.y);
         ctx.lineTo(link.to.x, link.to.y);
+        ctx.stroke();
+
+        if (!view_arrow) return;
+
+        // arrow
+        var dx = link.from.x - link.to.x;
+        var dy = link.from.y - link.to.y;
+        if (dx == 0 && dy == 0) return;
+        var angle = Math.atan2(dy, dx);
+        var px = link.to.x + CF_PORTAL_SIZE / 2 * Math.cos(angle);
+        var py = link.to.y + CF_PORTAL_SIZE / 2 * Math.sin(angle);
+        var angle1 = angle + 15 * Math.PI / 180;
+        var angle2 = angle - 15 * Math.PI / 180;
+        ctx.beginPath();
+        ctx.moveTo(px + 20 * Math.cos(angle1), py + 20 * Math.sin(angle1));
+        ctx.lineTo(px, py);
+        ctx.lineTo(px + 20 * Math.cos(angle2), py + 20 * Math.sin(angle2));
         ctx.stroke();
     };
     Board.prototype.draw_control_field = function(ctx, cf) {
@@ -277,14 +294,14 @@ var Board = (function() {
         ctx.closePath();
         ctx.fill();
     };
-    Board.prototype.draw = function(ctx, selected) {
+    Board.prototype.draw = function(ctx, selected, view_arrow) {
         for (var i = 0; i <  this.cfs.length; i++) {
             var cf = this.cfs[i];
             this.draw_control_field(ctx, cf);
         }
         for (var i = 0; i <  this.links.length; i++) {
             var link = this.links[i];
-            this.draw_link(ctx, link);
+            this.draw_link(ctx, link, view_arrow);
         }
         for (var id in this.portals) {
             var portal = this.portals[id];
@@ -958,11 +975,15 @@ $(function() {
         update();
     });
 
+    $('#view-arrow').change(function(e) {
+        update();
+    });
+
     var update = function() {
         command_list.apply(board);
         update_command_list();
         clear();
-        board.draw(ctx, selected);
+        board.draw(ctx, selected, $("#view-arrow").prop('checked'));
         update_share_link();
         update_portal_info();
     };
@@ -1252,6 +1273,13 @@ $(function() {
               <button id="clear" class="pull-right btn btn-default">クリア</button>
               <button id="clear-without-portal" class="pull-right btn btn-default">ポータルを残してクリア</button>
               <button id="flip" class="pull-right btn btn-default">反転</button>
+            </div>
+            <div class="col-md-12">
+              <div class="checkbox pull-right">
+                <label>
+                  <input id="view-arrow" type="checkbox" checked />矢印の表示
+                </label>
+              </div>
             </div>
           </div>
         </div>
