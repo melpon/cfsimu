@@ -1011,6 +1011,20 @@ $(function() {
         $('#portal-info .link').text(info.all.link);
     };
     var update_command_operators = function() {
+        var commands = command_list.get_commands();
+        var current = command_list.get_current();
+        console.log(current);
+        console.log(commands.length);
+        if (current == 0) {
+            $('#prev-command').hide();
+        } else {
+            $('#prev-command').show();
+        }
+        if (current == commands.length) {
+            $('#next-command').hide();
+        } else {
+            $('#next-command').show();
+        }
     };
     $(document).keydown(function(e){
         if (e.keyCode == 38) { // up
@@ -1265,6 +1279,10 @@ $(function() {
 #next-command {
     font-size: 40px;
 }
+.command-button {
+    height: 50px;
+}
+
 </style>
 
     <title>Ingress Control Field Simulator</title>
@@ -1286,14 +1304,14 @@ $(function() {
         <div class="col-md-1">
           <div class="row">
             <div class="col-md-12">
-              <div class="pull-right">
+              <div class="pull-right command-button">
                 <a id="prev-command"><span class="glyphicon glyphicon-arrow-up"></span></a>
               </div>
             </div>
           </div>
           <div class="row">
             <div class="col-md-12">
-              <div class="pull-right">
+              <div class="pull-right command-button">
                 <a id="next-command"><span class="glyphicon glyphicon-arrow-down"></span></a>
               </div>
             </div>
