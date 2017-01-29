@@ -1094,11 +1094,11 @@ $(function() {
             '<li class="list-group-item" data-id="$id$">' +
             '  <button type="button" class="close" aria-label="Close"><span aria-hidden="true">&times;</span></button>' +
             '  <div class="form-group">' +
-            '   <label>ポータル名</label>' +
+            '   <label>Portal 名</label>' +
             '   <input type="text" class="form-control input-sm portal-name">' +
             '  </div>' +
             '  <div class="form-group">' +
-            '    <label>初期陣営</label>' +
+            '    <label>開始所屬陣營</label>' +
             '    <label class="radio-inline">' +
             '      <input type="radio" class="initial-group" name="group-$id$" value="ENL">ENL' +
             '    </label>' +
@@ -1106,7 +1106,7 @@ $(function() {
             '      <input type="radio" class="initial-group" name="group-$id$" value="RES">RES' +
             '    </label>' +
             '  </div>' +
-            '  <p class="portal-info-$id$"><small>IN/OUTリンク:</small> <span class="in-link">5</span>(<span class="current-in-link">3</span>) / <span class="out-link">4</span>(<span class="current-out-link">1</span>)</p>' +
+            '  <p class="portal-info-$id$"><small>link 數 IN/OUT:</small> <span class="in-link">5</span>(<span class="current-in-link">3</span>) / <span class="out-link">4</span>(<span class="current-out-link">1</span>)</p>' +
             '</li>' +
             '');
         var portals = command_list.get_portals();
@@ -1153,9 +1153,9 @@ $(function() {
             var command = commands[i];
             var text;
             if (command.type == 'capture_portal') {
-                text = 'ポータル ' + portalobj[command.id].name + ' をキャプチャー';
+                text = 'Portal ' + portalobj[command.id].name + ' captured';
             } else if (command.type == 'link') {
-                text = 'ポータル ' + portalobj[command.from].name + ' から ポータル ' + portalobj[command.to].name + ' へリンク';
+                text = 'Portal ' + portalobj[command.from].name + ' linked to portal ' + portalobj[command.to].name;
             }
 
             var elem = $('<a>').attr('href', '#').attr('data-index', i + 1).addClass('list-group-item').text(text);
@@ -1323,14 +1323,14 @@ $(function() {
             </div>
             <div class="col-md-12" id="buttons">
               <a id="share" href="" target="_blank"><span class="glyphicon glyphicon-share"></span>共有URL</a>
-              <button id="clear" class="pull-right btn btn-default">クリア</button>
-              <button id="clear-without-portal" class="pull-right btn btn-default">ポータルを残してクリア</button>
-              <button id="flip" class="pull-right btn btn-default">反転</button>
+              <button id="clear" class="pull-right btn btn-default">重新開始</button>
+              <button id="clear-without-portal" class="pull-right btn btn-default">清除所有 link</button>
+              <button id="flip" class="pull-right btn btn-default">全部顏色反轉</button>
             </div>
             <div class="col-md-12">
               <div class="checkbox pull-right">
                 <label>
-                  <input id="view-arrow" type="checkbox" checked />矢印の表示
+                  <input id="view-arrow" type="checkbox" checked />顯示 link 方向
                 </label>
               </div>
             </div>
@@ -1339,7 +1339,7 @@ $(function() {
         <div class="col-md-5">
           <div class="row">
             <div class="col-md-12">
-              <p id="portal-info" class="text-right">合計CF数: <span class="cf">10</span>(<span class="current-cf">5</span>), 合計リンク数: <span class="link">15</span>(<span class="current-link">10</span>)</p>
+              <p id="portal-info" class="text-right">合計 Field 數: <span class="cf">10</span>(<span class="current-cf">5</span>), 合計 link 數: <span class="link">15</span>(<span class="current-link">10</span>)</p>
             </div>
             <div class="col-md-12">
               <div class="form-inline">
@@ -1361,32 +1361,32 @@ $(function() {
             <div class="panel-heading">
               <a role="button" data-toggle="collapse" href="#preset-body" aria-expanded="true" aria-controls="preset-body">
                 <h3 class="panel-title">
-                  プリセット
+                  預設範本
                 </h3>
               </a>
             </div>
             <div class="collapse" id="preset-body">
               <div class="panel-body">
-                <div><label>基本形:</label></div>
+                <div><label>基本:</label></div>
                 <div class="btn-group-vertical" role="group">
-                  <button type="button" class="btn btn-default preset" data-name="basic1">外三角形型</button>
-                  <button type="button" class="btn btn-default preset" data-name="basic2">内部分割型</button>
+                  <button type="button" class="btn btn-default preset" data-name="basic1">由外向內</button>
+                  <button type="button" class="btn btn-default preset" data-name="basic2">先內後外</button>
                 </div>
-                <div><label>一方向に伸ばすタイプ:</label></div>
+                <div><label>單方向伸展:</label></div>
                 <div class="btn-group-vertical" role="group">
-                  <button type="button" class="btn btn-default preset" data-name="oneway1">発散型（Ａ型、タケノコ）</button>
-                  <button type="button" class="btn btn-default preset" data-name="oneway2">収縮型（Ｉ型、キール）</button>
-                  <button type="button" class="btn btn-default preset" data-name="oneway3">放射型（３９式）</button>
+                  <button type="button" class="btn btn-default preset" data-name="oneway1">層層遞進</button>
+                  <button type="button" class="btn btn-default preset" data-name="oneway2">兩點射擊</button>
+                  <button type="button" class="btn btn-default preset" data-name="oneway3">兩點射擊極限版（兩面各四金鴨）</button>
                 </div>
-                <div><label>二方向に伸ばすタイプ:</label></div>
+                <div><label>兩方向伸展:</label></div>
                 <div class="btn-group-vertical" role="group">
-                  <button type="button" class="btn btn-default preset" data-name="twoway1">発散型（扇型）</button>
-                  <button type="button" class="btn btn-default preset" data-name="twoway2">収縮型（Ｖ型）</button>
+                  <button type="button" class="btn btn-default preset" data-name="twoway1">層層遞進</button>
+                  <button type="button" class="btn btn-default preset" data-name="twoway2">左右開弓</button>
                 </div>
-                <div><label>三方向に伸ばすタイプ:</label></div>
+                <div><label>三方向伸展:</label></div>
                 <div class="btn-group-vertical" role="group">
-                  <button type="button" class="btn btn-default preset" data-name="threeway1">発散型（ぐるぐる、螺旋）</button>
-                  <button type="button" class="btn btn-default preset" data-name="threeway2">収縮型（Ｙ型、カクテルグラス型）</button>
+                  <button type="button" class="btn btn-default preset" data-name="threeway1">螺旋形</button>
+                  <button type="button" class="btn btn-default preset" data-name="threeway2">雞尾酒杯形</button>
                 </div>
               </div>
             </div>
