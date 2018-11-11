@@ -321,6 +321,7 @@ var CommandList = (function() {
         this.commands = [];
         this.current = 0;
         this.portal_id = 1;
+        this.expanded = 0;
     };
     CommandList.prototype.clear_without_portal = function() {
         this.commands = [];
@@ -344,7 +345,7 @@ var CommandList = (function() {
     };
     CommandList.prototype.expand_contract = function() {
         var canvas = $('#canvas')[0];
-        if(canvas.width <= 400){
+        if(!this.expanded){
             $("#info-container").detach().appendTo("#main-row2");
             $('#info-row1').removeClass('row').addClass('col-md-6');
             $('#info-row2').removeClass('row').addClass('col-md-6');
@@ -353,6 +354,7 @@ var CommandList = (function() {
             $('#expand-contract').html("Contract");
             canvas.width = 1500;
             canvas.height = 800;
+            this.expanded = 1;
         }
         else{
             $("#info-container").detach().appendTo("#main-row1");
@@ -363,8 +365,9 @@ var CommandList = (function() {
             $('#expand-contract').html("Expand");
             canvas.width = 400;
             canvas.height = 400;
+            this.expanded = 0;
         }
-	};
+    };
     CommandList.prototype.flip = function() {
         for (var i = 0; i < this.portals.length; i++) {
             var portal = this.portals[i];
@@ -579,6 +582,7 @@ var CommandList = (function() {
                 str += serialize_int(command.to);
             }
         }
+        str += serialize_int(this.expanded);
         return str;
     };
     CommandList.prototype.from_string = function(str) {
@@ -644,6 +648,13 @@ var CommandList = (function() {
                 this.link(from, to);
             }
         }
+        
+        var t = deserialize_int(remain);
+        var request_expanded = t.result;
+        remain = t.remain;
+        
+        if(request_expanded && !this.expanded) this.expand_contract();
+        
         this.set_current(current);
     };
     return CommandList;
