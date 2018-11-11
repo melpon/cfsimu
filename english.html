@@ -321,6 +321,7 @@ var CommandList = (function() {
         this.commands = [];
         this.current = 0;
         this.portal_id = 1;
+        this.expanded = 0;
     };
     CommandList.prototype.clear_without_portal = function() {
         this.commands = [];
@@ -341,6 +342,31 @@ var CommandList = (function() {
     };
     CommandList.prototype.get_current = function() {
         return this.current;
+    };
+    CommandList.prototype.expand_contract = function() {
+        var canvas = $('#canvas')[0];
+        if(!this.expanded){
+            $("#info-container").detach().appendTo("#main-row2");
+            $('#info-row1').removeClass('row').addClass('col-md-6');
+            $('#info-row2').removeClass('row').addClass('col-md-6');
+            $('#canvas-container').removeClass('col-md-5').addClass('col-md-10');
+            $('#info-container').removeClass('col-md-5').addClass('col-md-10');
+            $('#expand-contract').html("Contract");
+            canvas.width = 1500;
+            canvas.height = 800;
+            this.expanded = 1;
+        }
+        else{
+            $("#info-container").detach().appendTo("#main-row1");
+            $('#info-row1').removeClass('col-md-6').addClass('row');
+            $('#info-row2').removeClass('col-md-6').addClass('row');
+            $('#canvas-container').removeClass('col-md-10').addClass('col-md-5');
+            $('#info-container').removeClass('col-md-10').addClass('col-md-5');
+            $('#expand-contract').html("Expand");
+            canvas.width = 400;
+            canvas.height = 400;
+            this.expanded = 0;
+        }
     };
     CommandList.prototype.flip = function() {
         for (var i = 0; i < this.portals.length; i++) {
@@ -556,6 +582,7 @@ var CommandList = (function() {
                 str += serialize_int(command.to);
             }
         }
+        str += serialize_int(this.expanded);
         return str;
     };
     CommandList.prototype.from_string = function(str) {
@@ -621,6 +648,13 @@ var CommandList = (function() {
                 this.link(from, to);
             }
         }
+        
+        var t = deserialize_int(remain);
+        var request_expanded = t.result;
+        remain = t.remain;
+        
+        if(request_expanded && !this.expanded) this.expand_contract();
+        
         this.set_current(current);
     };
     return CommandList;
@@ -1068,6 +1102,10 @@ $(function() {
         command_list.flip();
         update();
     });
+    $('#expand-contract').on('click', function(e) {
+        command_list.expand_contract();
+        update();
+    });
     $('.preset').on('click', function(e) {
         command_list.clear();
         preset.preset($(this).attr('data-name'), command_list, 'ENL', function() { return command_list.incr_portal_id(); });
@@ -1270,6 +1308,9 @@ $(function() {
 #flip {
     margin-right: 10px;
 }
+#expand-contract {
+    margin-right: 10px;
+}
 #preset-top {
     margin-top: 10px;
 }
@@ -1307,7 +1348,7 @@ $(function() {
       </div>
     </nav>
     <div id="main" role="main">
-      <div class="row">
+      <div id="main-row1" class="row">
         <div class="col-md-1">
           <div class="row">
             <div class="col-md-12">
@@ -1324,7 +1365,7 @@ $(function() {
             </div>
           </div>
         </div>
-        <div class="col-md-5">
+        <div id="canvas-container" class="col-md-5">
           <div class="row">
             <div class="col-md-12">
               <canvas id="canvas" width="400" height="400"></canvas>
@@ -1334,6 +1375,7 @@ $(function() {
               <button id="clear" class="pull-right btn btn-default">Clear</button>
               <button id="clear-without-portal" class="pull-right btn btn-default">Clear Links Only</button>
               <button id="flip" class="pull-right btn btn-default">Flip</button>
+              <button id="expand-contract" class="pull-right btn btn-default">Expand</button>
             </div>
             <div class="col-md-12">
               <div class="checkbox pull-right">
@@ -1344,8 +1386,8 @@ $(function() {
             </div>
           </div>
         </div>
-        <div class="col-md-5">
-          <div class="row">
+        <div id="info-container" class="col-md-5">
+          <div id="info-row1" class="row">
             <div class="col-md-12">
               <p id="portal-info" class="text-right"># of Fields: <span class="cf">10</span>(<span class="current-cf">5</span>), # of Links: <span class="link">15</span>(<span class="current-link">10</span>)</p>
             </div>
@@ -1356,14 +1398,18 @@ $(function() {
               </div>
             </div>
           </div>
-          <div class="row">
+          <div id="info-row2" class="row">
             <div class="col-md-12">
               <div id="command-list" class="list-group"></div>
             </div>
           </div>
         </div>
       </div>
-      <div class="row">
+      <div id="main-row2" class="row">
+        <div class="col-md-1">
+        </div>
+      </div>
+      <div id="main-row3" class="row">
         <div class="col-md-offset-1 col-md-5">
           <div class="panel panel-default">
             <div class="panel-heading">
